@@ -327,10 +327,35 @@ qt-print-totals: func [
   --assert 2 = select [1 2 3 4 5] 1
   --test-- "series-select-2"
   --assert 5 = select [1 2 3 4 5] 4
-  --test-- "series-select-1"
+  --test-- "series-select-3"
   --assert none = select [1 2 3 4 5] 0
-  --test-- "series-select-1"
+  --test-- "series-select-4"
   --assert none = select [1 2 3 4 5] 5
+  
+	--test-- "series-select-5"
+		a: [2 3 5 test #"A" a/b 5 "tesT"]
+		--assert #"A" = select a 'test
+		
+	--test-- "series-select-6"
+		list: [a 1 b 2 c 3]
+		--assert 2 = list/b
+		
+	--test-- "series-select-6"
+		--assert 'test = select/skip a 5 2
+
+	--test-- "series-select-7"
+		s: "Hello, Red World!"
+		--assert #"e" = select s #"r"
+
+	--test-- "series-select-8"
+		--assert #"l" = select/last s #"r"
+
+	--test-- "series-select-9"
+		--assert #"d" = select/skip s "e" 2
+
+	--test-- "series-select-10"
+		--assert none? select s #"!"
+  
 ===end-group===
 
 ===start-group=== "append"
@@ -358,9 +383,36 @@ qt-print-totals: func [
   --assert 65536 = last append "abcde" "^(010000)"   
   --test-- "series-append-11"
   --assert 48 = last append "abcde^(010000)" "0"
-  --test-- "series=append-12"
+  --test-- "series-append-12"
   --assert 65536 = last append "abcde^(2710)é" "^(010000)" 
   
+  --test-- "series-append-13"
+	blk: make block! 1
+	append blk 'x/y
+	append/only blk  'r/s
+	--assert "[x y r/s]" = mold blk
+
+  --test-- "series-append-14"
+	blk: [1 2]
+	append/dup/part blk [4 5 6] 3 2
+	--assert "[1 2 4 5 4 5 4 5]" = mold blk
+	
+  --test-- "series-append-15"
+	blk: [1 2]
+	append/dup/part blk [4 5 6] 2 3
+	--assert "[1 2 4 5 6 4 5 6]" = mold blk	
+
+  --test-- "series-append-16"
+	str: "12"
+	append/dup/part str "456" 3 2 
+	--assert str = "12454545"
+
+  --test-- "series-append-17"
+	str: "12"
+	append/part/dup str "456" 3 2 
+	--assert str = "12456456"
+
+	
 ===end-group===
 
 ===start-group=== "series-equal"
@@ -489,8 +541,134 @@ qt-print-totals: func [
   
   --test-- "series-find-34"
   --assert "^(010000)cde^(2710)é" = find "ab^(010000)cde^(2710)é" "^(010000)"
-  
 
+	--test-- "series-find-35"  
+		a: [2 3 5 test #"A" a/b 5 "tesT"]
+		append a datatype!
+		--assert 3 = index? find a 5
+	
+	--test-- "series-find-36"
+		--assert 8 = index? find a "test"
+
+	--test-- "series-find-37"
+		--assert none? find a 99
+
+	--test-- "series-find-38"
+		--assert none? find/skip a 'test 2
+		
+	--test-- "series-find-39"
+		--assert 4 = index? find/skip a 'test 3
+
+	--test-- "series-find-40"
+		--assert 7 = index? find/last a 5
+		
+	--test-- "series-find-41"
+		--assert 2 = index? find/reverse skip a 4 3
+
+	--test-- "series-find-42"
+		--assert 8 = index? find skip a 3 "test"
+		
+	--test-- "series-find-43"
+		--assert none? find/last/part a 3 1
+
+	--test-- "series-find-44"
+		--assert 2 = index? find/last/part a 3 2
+
+	--test-- "series-find-45"
+		--assert none? find/part a 'test 3
+
+	--test-- "series-find-46"
+		--assert 4 = index? find/part a 'test 4
+
+	--test-- "series-find-47"
+		--assert 2 = index? find a [3 5]
+		
+	--test-- "series-find-48"
+		--assert 3 = index? find a [5 'test]
+	
+	--test-- "series-find-49"
+		--assert none? find a 'a/b
+	
+	--test-- "series-find-50"
+		--assert 6 = index? find/only a 'a/b
+
+	--test-- "series-find-51"
+		--assert 2 = index? find/match a 2
+
+	--test-- "series-find-52"
+		--assert none? find/match a 3
+
+	--test-- "series-find-53"
+		--assert 4 = index? find/match a [2 3 5]
+
+	--test-- "series-find-54"
+		--assert none? find/match next a [2 3 5]
+		
+	--test-- "series-find-55"
+		--assert 4 = index? find/tail a 5
+
+	--test-- "series-find-56"
+		--assert 3 = index? find 'a/b/3/d 3
+		
+	--test-- "series-find-57"
+		--assert 2 = index? find 'a/b/3/d 'b
+		
+	--test-- "series-find-58"
+		s: "Hello, Red World!"
+		--assert 6 = index? find s ","
+
+	--test-- "series-find-59"
+		--assert 8 = index? find s "Red"
+
+	--test-- "series-find-60"
+		--assert 8 = index? find s "red"
+
+	--test-- "series-find-61"
+		--assert 6 = index? find s #","
+
+	--test-- "series-find-62"
+		--assert 1 = index? find "^(00)" "^(00)"
+
+	--test-- "series-find-63"
+		--assert 5 = index? find/skip s #"o" 2
+		
+	--test-- "series-find-64"
+		--assert 13 = index? find/skip s #"o" 3
+
+	--test-- "series-find-65"
+		--assert 15 = index? find/last s #"l"
+
+	--test-- "series-find-66"
+		--assert 13 = index? find/last s "o"
+
+	--test-- "series-find-67"
+		--assert none? find/part s #"o" 4
+
+	--test-- "series-find-68"
+		--assert 5 = index? find/part s #"o" 5
+
+	--test-- "series-find-69"
+		--assert 2 = index? find/match s #"h"
+
+	--test-- "series-find-70"
+		--assert 5 = index? find/match s "hell"
+
+	--test-- "series-find-71"
+		--assert 5 = index? find/match s "Hell"
+
+	--test-- "series-find-72"
+		--assert none? find/match/case s "hell"
+
+	--test-- "series-find-73"
+		--assert 5 = index? find/match/case s "Hell"
+
+	--test-- "series-find-74"
+		--assert none? find/match next s "hell"
+
+	--test-- "series-find-75"
+		--assert 8 = index? find/case s "Red"
+
+		
 ===end-group===
 
 ~~~end-file~~~

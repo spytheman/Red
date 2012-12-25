@@ -1,7 +1,7 @@
 Red [
-	Title:   "Red loops test script"
+	Title:   "Red serialization (MOLD/FORM) test script"
 	Author:  "Nenad Rakocevic & Peter W A Wood"
-	File: 	 %loop-test.reds
+	File: 	 %serialization-test.reds
 	Tabs:	 4
 	Rights:  "Copyright (C) 2011-2012 Nenad Rakocevic & Peter W A Wood. All rights reserved."
 	License: "BSD-3 - https://github.com/dockimbel/Red/blob/origin/BSD-3-License.txt"
@@ -148,67 +148,57 @@ qt-print-totals: func [
 
 ;; end of quick test
 
-~~~start-file~~~ "loop"
+~~~start-file~~~ "serialization"
 
-===start-group=== "basic repeat tests"
+blk: [
+	1 #[none] #[true] #[false] #"c" "red" Red a/b 'a/b :a/b a/b: (1 + 2)
+	[a] [[[]]] [[[a]]] [c [d [b] e] f] :w 'w w: /w :word 'word word: /word
+]
 
-  --test-- "br1"                      ;; Documenting non-local index counter
-    br1-i: 0
-    repeat br1-i 100 [ ]
-  --assert 101 = br1-i                
-  
-  --test-- "br2"                      ;; Documenting non-local index counter
-    br2-i: -99
-    repeat br2-i 100 [ ]
-  --assert 101 = br2-i 
-  
-  --test-- "br3"                      ;; Documenting non-local index counter
-    repeat br3-i 100 [ ]
-  --assert 101 = br3-i 
-  
-===end-group===
+molded: {[1 none true false #"c" "red" Red a/b 'a/b :a/b a/b: (1 + 2) [a] [[[]]] [[[a]]] [c [d [b] e] f] :w 'w w: /w :word 'word word: /word]}
+formed: {1 none true false c red Red a/b 'a/b :a/b a/b: 1 + 2 a  a c d b e f w w w w word word word word}
 
-===start-group=== "basic until tests"
+===start-group=== "Basic MOLD tests"
 
-  --test-- "bu1"
-    bul-i: 0
-    until [
-      bu1-i: bu1-i + 1
-      bul-i > 10
-    ]
-  --assert bu1-i = 11 
-  
-===end-group=== 
+	--test-- "ser-1"
+	--assert "[]" = mold []
+	
+	--test-- "ser-2"
+	--assert "" = mold/only []
+	
+	--test-- "ser-3"
+	--assert "[1 2 3]" = mold [1 2 3]
 
-===start-group=== "basic loop tests"
+	--test-- "ser-4"
+	--assert "1 2 3" = mold/only [1 2 3]
 
-  --test-- "bl1"                      ;; Documenting non-local index counter
-    i: 10
-    loop i [i: i - 1]
-  --assert i = 0
-  
- ; --test-- "bl2"                      ;; Documenting non-local index counter
- ;   i: -1
- ;   loop i [i: i + 1]
- ; --assert i = 0 
-  
-  --test-- "bl3"                      ;; Documenting non-local index counter
-    i: 0
-    loop i [i: i + 1]
-  --assert i = 0 
-  
-===end-group===
-
-===start-group=== "mixed tests"
-        
-    --test-- "ml1"                      ;; Documenting non-local index counter
-    a: 0
-    repeat c 4 [
-		loop 5 [a: a + 1]
+	--test-- "ser-5"
+	--assert molded = mold blk
+	
+	--test-- "ser-6"
+	repeat i 132 [
+		--assert (copy/part molded i) = mold/part blk i
 	]
-    --assert a = 20 
-
+	
 ===end-group===
-    
+
+===start-group=== "Basic FORM tests"
+
+	--test-- "ser-7"
+	--assert "" = form []
+	
+	--test-- "ser-8"
+	--assert "1 2 3" = form [1 2 3]
+
+	--test-- "ser-9"
+	--assert formed	= form blk
+	
+	--test-- "ser-10"
+	repeat i 132 [
+		--assert (copy/part formed i) = form/part blk i
+	]
+	
+===end-group===
+
 ~~~end-file~~~
 

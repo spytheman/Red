@@ -23,6 +23,15 @@ integer: context [
 		int/value
 	]
 	
+	get-any*: func [									;-- special get* variant for SWITCH
+		return: [integer!]
+		/local
+			int [red-integer!]
+	][
+		int: as red-integer! stack/arguments
+		either TYPE_OF(int) = TYPE_INTEGER [int/value][0] ;-- accept NONE values
+	]
+	
 	get: func [											;-- unboxing integer value
 		value	[red-value!]
 		return: [integer!]
@@ -32,6 +41,16 @@ integer: context [
 		assert TYPE_OF(value) = TYPE_INTEGER
 		int: as red-integer! value
 		int/value
+	]
+	
+	box: func [
+		value	[integer!]
+		/local
+			int [red-integer!]
+	][
+		int: as red-integer! stack/arguments
+		int/header: TYPE_INTEGER
+		int/value: value
 	]
 	
 	form-signed: func [									;@@ replace with sprintf() call?

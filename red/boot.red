@@ -303,7 +303,7 @@ next: make action! [[
 
 pick: make action! [[
 		series	 [series!]
-		index 	 [integer!]
+		index 	 [integer! logic!]
 		return:  [any-type!]
 	]
 	#get-definition ACT_PICK
@@ -311,7 +311,7 @@ pick: make action! [[
 
 poke: make action! [[
 		series	 [series!]
-		index 	 [integer!]
+		index 	 [integer! logic!]
 		value 	 [any-type!]
 		return:  [series!]
 	]
@@ -503,6 +503,21 @@ return: make native! [[
 	none
 ]
 
+switch: make native! [[
+		value [any-type!]
+		cases [block!]
+		/default
+			case [block!]
+	]
+	none
+]
+
+case: make native! [[
+		cases [block!]
+		/all
+	]
+	none
+]
 
 get: make native! [[
 		word	[word!]
@@ -514,8 +529,8 @@ get: make native! [[
 
 set: make native! [[
 		word	[lit-word!]
-		/any
 		value	[any-type!]
+		/any		
 		return: [any-type!]
 	]
 	none

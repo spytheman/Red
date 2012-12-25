@@ -53,7 +53,7 @@ red: context [
 	intrinsics:   [
 		if unless either any all while until loop repeat
 		foreach forall break halt func function does has
-		exit return
+		exit return switch case routine
 	]
 
 	functions: make hash! [
@@ -150,7 +150,7 @@ red: context [
 		][
 			emit 'stack/push							;-- local word
 		][
-			if new: select ssa-names name [name: new]	;@@ add a check for funtion! type
+			if new: select ssa-names name [name: new]	;@@ add a check for function! type
 			emit 'word/get								;-- global word
 		]
 		emit decorate-symbol name
@@ -217,6 +217,10 @@ red: context [
 		mold/flat to word! name
 	]
 	
+	decorate-type: func [type [word!]][
+		to word! join "red-" mold/flat type
+	]
+	
 	decorate-symbol: func [name [word!] /local pos][
 		if pos: find/case/skip aliases name 2 [name: pos/2]
 		to word! join "~" clean-lf-flag name
@@ -281,6 +285,18 @@ red: context [
 		]
 	]
 	
+	convert-types: func [spec [block!] /local value][
+		forall spec [
+			if spec/1 = /local [break]					;-- avoid processing local variable
+			if all [
+				block? value: spec/1
+				not find [integer! logic!] value/1 
+			][
+				value/1: decorate-type value/1
+			]
+		]
+	]
+	
 	check-invalid-call: func [name [word!]][
 		if all [
 			find [exit return] name
@@ -326,8 +342,9 @@ red: context [
 				pos: set-word! (if pos/1 <> return-def [stop: [end skip]]) stop
 				pos: block! opt string!
 			]
+			opt [/local some [pos: word! pos: opt block! pos: opt string!]]
 		][
-			throw-error ["invalid function spec block:" pos]
+			throw-error ["invalid function spec block:" mold pos]
 		]
 		forall spec [
 			if all [
@@ -375,9 +392,9 @@ red: context [
 		reduce [list arity]
 	]
 	
-	add-function: func [name [word!] spec [block!] /local refs arity][
+	add-function: func [name [word!] spec [block!] /type kind [word!] /local refs arity][
 		set [refs arity] make-refs-table spec
-		repend functions [name reduce ['function! arity spec refs]]
+		repend functions [name reduce [any [kind 'function!] arity spec refs]]
 	]
 	
 	fetch-functions: func [pos [block!] /local name type spec refs arity][
@@ -410,8 +427,8 @@ red: context [
 		
 		forall blk [
 			item: blk/1
-			either any-block? item [
-				type: either all [path? item get-word? item/1]['get-path][type? item]
+			either any-block? :item [
+				type: either all [path? item get-word? item/1]['get-path][type? :item]
 				
 				emit-open-frame 'append
 				emit to lit-path! reduce [to word! form type 'push*]
@@ -545,6 +562,40 @@ red: context [
 				--not-implemented--
 			]
 		]
+	]
+		
+	emit-routine: func [name [word!] spec [block!] /local type cnt offset][
+		emit [arg: stack/arguments]
+		insert-lf -2
+
+		offset: 0
+		if all [
+			type: select spec return-def
+			find [integer! logic!] type/1 
+		][
+			offset: 1
+			append/only output append to path! form get spec/2/1 'box
+		]		
+		emit name
+		cnt: 0
+
+		forall spec [
+			if any [spec/1 = /local set-word? spec/1][
+				spec: head spec
+				break									;-- avoid processing local variable	
+			]
+			unless block? spec/1 [
+				either find [integer! logic!] spec/2/1 [
+					append/only output append to path! form get spec/2/1 'get
+				][
+					emit reduce ['as spec/2/1]
+				]
+				emit 'arg
+				unless head? spec [emit reduce ['+ cnt]]
+				cnt: cnt + 1
+			]
+		]
+		insert-lf negate cnt * 2 + offset + 1
 	]
 	
 	redirect-to-literals: func [body [block!] /local saved][
@@ -968,6 +1019,37 @@ red: context [
 		comp-func/has
 	]
 	
+	comp-routine: has [name spec body spec-blk body-blk][
+		name: check-func-name to word! pc/-1
+		add-symbol to word! clean-lf-flag name
+		pc: next pc
+		set [spec body] pc
+
+		check-spec spec
+		add-function/type name spec 'routine!
+		
+		set [spec-blk body-blk] redirect-to-literals [
+			reduce [emit-block spec emit-block body]	;-- store spec and body blocks
+		]
+		
+		emit reduce [to set-word! name 'func]
+		insert-lf -2
+		convert-types spec
+		append/only output spec
+		append/only output body
+		
+		emit-open-frame 'set							;-- routine value creation
+		emit-push-word name
+		emit compose [
+			routine/push (spec-blk) (body-blk)
+		]
+		emit 'word/set
+		insert-lf -1
+		emit-close-frame
+
+		pc: skip pc 2
+	]
+	
 	comp-exit: does [
 		pc: next pc
 		emit [
@@ -985,7 +1067,129 @@ red: context [
 		]
 	]
 	
-	comp-path: func [/set /local path value emit? get? entry][
+	comp-switch: has [mark name arg body list cnt pos default?][
+		if path? pc/-1 [
+			foreach ref next pc/-1 [
+				switch/default ref [
+					default [default?: yes]
+					;all []
+				][throw-error ["SWITCH has no refinement called" ref]]
+			]
+		]
+		mark: tail output								;-- pre-compile the SWITCH argument
+		comp-expression
+		arg: copy mark
+		clear mark
+		
+		body: pc/1
+		pc: next pc										;-- move passed SWITCH body
+		
+		unless block? body [
+			throw-error "SWITCH expects a block as second argument"
+		]
+		list: make block! 4
+		cnt: 1
+		foreach w body [								;-- build a [value index] pairs list
+			either block? w [cnt: cnt + 1][repend list [w cnt]]
+		]
+		name: redirect-to-literals [emit-block list]
+		
+		emit-open-frame 'select							;-- SWITCH lookup frame
+		emit compose [block/push (name)]
+		insert-lf -2
+		emit arg
+		emit [integer/push 2]							;-- /skip 2
+		insert-lf -2
+		emit-action/with 'select [-1 -1 -1 -1 -1 2 -1 -1] ;-- select/skip
+		emit-close-frame
+		
+		emit [switch integer/get-any*]
+		insert-lf -2
+		
+		clear list
+		cnt: 1
+		parse body [									;-- build SWITCH cases
+			some [pos: block! (
+				mark: tail output
+				comp-sub-block/with 'switch-body pos/1
+				pc: back pc								;-- restore PC position (no block consumed)
+				repend list [cnt mark/1]
+				clear mark
+				cnt: cnt + 1
+			) | skip]
+		]
+		
+		append list 'default							;-- process default case
+		either default? [
+			comp-sub-block 'switch-default				;-- compile default block
+			append/only list last output
+			clear back tail output
+		][
+			append/only list copy [0]					;-- placeholder for keeping R/S compiler happy
+		]
+		append/only output list
+	]
+	
+	comp-case: has [all? path saved list mark body][
+		if path? path: pc/-1 [
+			either path/2 = 'all [all?: yes][
+				throw-error ["CASE has no refinement called" path/2]
+			]
+		]
+		unless block? pc/1 [
+			throw-error "CASE expects a block as argument"
+		]
+		
+		saved: pc
+		pc: pc/1
+		list: make block! length? pc
+		
+		while [not tail? pc][							;-- precompile all conditions and cases
+			mark: tail output
+			comp-expression								;-- process condition
+			append/only list copy mark
+			clear mark
+			append/only list comp-sub-block 'case		;-- process case block
+			clear back tail output
+		]
+		pc: next saved
+		
+		either all? [
+			foreach [test body] list [					;-- /all mode
+				emit-open-frame 'case
+				emit test
+				emit compose/deep [
+					either logic/false? [(set-last-none)]
+				]
+				append/only output body
+				emit-close-frame
+			]
+		][												;-- default single selection mode
+			list: skip tail list -2
+			body: reduce ['either 'logic/true? list/2 set-last-none]
+			new-line body yes
+			insert body list/1
+			
+			;-- emit expressions tree from leaf to root
+			while [not head? list][
+				list: skip list -2
+				
+				insert/only body 'stack/reset
+				new-line body yes
+				
+				body: reduce ['either 'logic/true? list/2 body]
+				new-line body yes
+				insert body list/1
+			]
+			
+			emit-open-frame 'case
+			emit body
+			emit-close-frame
+		]
+		
+	]
+	
+	comp-path: func [/set /local path value emit? get? entry alter][
 		path: copy pc/1
 		emit?: yes
 		
@@ -993,6 +1197,9 @@ red: context [
 			switch/default type?/word value: path/1 [
 				word! [
 					if all [not set not get? entry: find functions value][
+						if alter: select ssa-names value [
+							entry: find functions alter
+						]
 						either head? path [
 							pc: next pc
 							comp-call path entry/2		;-- call function with refinements
@@ -1047,7 +1254,7 @@ red: context [
 		/local item name compact? refs ref? cnt pos ctx mark list offset emit-no-ref args
 	][
 		either spec/1 = 'intrinsic! [
-			switch call keywords
+			switch any [all [path? call call/1] call] keywords
 		][
 			compact?: spec/1 <> 'function!				;-- do not push refinements on stack
 			refs: make block! 1							;-- refinements storage in compact mode
@@ -1092,11 +1299,11 @@ red: context [
 						unless pos: find/skip spec/4 to refinement! ref 3 [
 							throw-error [call/1 "has no refinement called" ref]
 						]
-						offset: pos/2 + spec/2 + 1
+						offset: pos/2 + 1
 						poke ctx index? pos true		;-- switch refinement to true in context
 						unless zero? pos/3 [			;-- process refinement's arguments
 							list: make block! 1
-							insert/only at ctx offset list ;-- add a adjacent block of code
+							ctx/:offset: list 			;-- compiled refinement arguments storage
 							loop pos/3 [
 								mark: tail output
 								comp-arguments/ref spec/3 1 to refinement! ref
@@ -1131,7 +1338,8 @@ red: context [
 				native! 	[emit-native/with name refs]
 				action! 	[emit-action/with name refs]
 				op!			[]
-				function!	[emit decorate-func name insert-lf -1]
+				function! 	[emit decorate-func name insert-lf -1]
+				routine!	[emit-routine name spec/3]
 			]
 			emit-close-frame
 		]
@@ -1160,6 +1368,7 @@ red: context [
 			pc/1 = 'function [comp-function]
 			pc/1 = 'has		 [comp-has]
 			pc/1 = 'does	 [comp-does]
+			pc/1 = 'routine	 [comp-routine]
 			all [
 				not empty? locals-stack
 				find last locals-stack name
@@ -1178,7 +1387,7 @@ red: context [
 		]
 	]
 
-	comp-word: func [/literal /final /local name local?][
+	comp-word: func [/literal /final /local name local? alter][
 		name: to word! pc/1
 		pc: next pc										;@@ move it deeper
 		local?: local-word? name
@@ -1198,6 +1407,9 @@ red: context [
 				not local?
 				entry: find functions name
 			][
+				if alter: select ssa-names name [
+					entry: find functions alter
+				]
 				check-invalid-call name
 				comp-call name entry/2
 			]
@@ -1478,7 +1690,7 @@ red: context [
 			new-line at out 3 yes
 		]
 
-		out/7/3: script									;-- inject compilation result in template
+		change/only find last out <script> script		;-- inject compilation result in template
 		output:  out
 		if verbose > 2 [?? output]
 	]

@@ -13,6 +13,29 @@ Red/System [
 string: context [
 	verbose: 0
 	
+	rs-length?: func [
+		str	    [red-string!]
+		return: [integer!]
+	][
+		get-length str
+	]
+
+	rs-head: func [
+		str	    [red-string!]
+		return: [byte-ptr!]
+	][
+		s: GET_BUFFER(str)
+		as byte-ptr! s/offset
+	]
+
+	rs-tail: func [
+		str	    [red-string!]
+		return: [byte-ptr!]
+	][
+		s: GET_BUFFER(str)
+		as byte-ptr! s/tail
+	]
+	
 	get-position: func [
 		base	   [integer!]
 		return:	   [integer!]
@@ -1034,45 +1057,40 @@ string: context [
 	]
 
 	poke: func [
+		str		   [red-string!]
+		index	   [integer!]
+		char	   [red-char!]
 		return:	   [red-value!]
 		/local
-			str	   [red-string!]
-			index  [red-integer!]
-			char   [red-char!]
 			s	   [series!]
-			idx	   [integer!]
 			offset [integer!]
 			pos	   [byte-ptr!]
 	][
 		#if debug? = yes [if verbose > 0 [print-line "string/poke"]]
 
-		str: as red-string! stack/arguments
 		s: GET_BUFFER(str)
 		
-		index: as red-integer! str + 1
-		idx: index/value
-		
-		offset: str/head + idx - 1						;-- index is one-based
-		if negative? idx [offset: offset + 1]
+		offset: str/head + index - 1					;-- index is one-based
+		if negative? index [offset: offset + 1]
 		
 		pos: (as byte-ptr! s/offset) + (offset << (GET_UNIT(s) >> 1))
 		
 		either any [
-			zero? idx
+			zero? index
 			pos >= as byte-ptr! s/tail
 			pos <  as byte-ptr! s/offset
 		][
 			--NOT_IMPLEMENTED--
 			;TBD: waiting for error!
 		][
-			char: as red-char! str + 2
 			if TYPE_OF(char) <> TYPE_CHAR [
 				print-line "Error: POKE expected char! value"	;@@ replace by error! when ready
 				halt
 			]
 			poke-char s pos char/value
+			stack/set-last as red-value! char
 		]
-		as red-value! str
+		as red-value! char
 	]
 	
 	;--- Misc actions ---

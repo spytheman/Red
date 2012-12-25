@@ -36,18 +36,17 @@ Red/System [
 	TYPE_SET_PATH
 	TYPE_GET_PATH
 	TYPE_PAREN
+	TYPE_ROUTINE
 	
 	TYPE_TYPESET
-
 	TYPE_ERROR
 
 	TYPE_BINARY
 
-
 	TYPE_ISSUE
 
 	TYPE_CLOSURE
-	TYPE_ROUTINE
+	
 	TYPE_OBJECT
 	TYPE_PORT
 	TYPE_BITSET
@@ -161,6 +160,9 @@ Red/System [
 #define ALLOC_TAIL(series)	[alloc-at-tail series]
 #define FLAG_SET?(flag)		(flags and flag <> 0)
 #define OPTION?(ref-ptr)	(ref-ptr > stack/arguments)	;-- a bit inelegant, but saves a lot of code
+
+
+#define SET_RETURN(value)	[stack/set-last as red-value! value]
 
 #define --NOT_IMPLEMENTED--	[
 	print-line "Error: feature not implemented yet!"
